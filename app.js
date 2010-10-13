@@ -171,12 +171,6 @@ function downloadFileFromTo(host, get, dest, callback) {
         request.end();
     });
 }
-/*
-downloadFileFromTo('ecmascript.se', '/2-31%20-%20Nostalgic%20Song%20~Ending%20Theme%20for%20Mana\'s%20Story~.mp3', '/Users/adam/musi/downloaded/hej.mp3', function () {
-    console.log('done');
-});
-*/
-
 
 irc.connect(function () {
     irc.join(joinChan);
