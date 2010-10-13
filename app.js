@@ -4,6 +4,12 @@ var fs = require('fs');
 var http = require('http');
 
 var musicDest = "/Users/adam/musi/downloaded/";
+var ircServer = "irc.vassius.se";
+//ircServer = "irc.freenode.net";
+//ircServer = "se.quakenet.org";
+var nick = "mediabot";
+var joinChan = "#c-test";
+//oinChan = "#natur2";
 
 var play = function () {
     console.log("_play");
@@ -21,34 +27,40 @@ var queueSong = function (query, index) {
     console.log('itunes-queue', [query, index]);
     spawn('itunes-queue', [query, index]);
 };
-var whatsPlaying = function (callback) {
-    var iwp = spawn('itunes-whatsplaying');
-    iwp.stdout.on('data', function (data) {
-        callback(data.toString());
-    });
-};
-var search = function (query, callback) {
-    var is = spawn('itunes-search', [query]);
-    is.stdout.on('data', function (data) {
-        callback(data.toString());
-    });
-};
-var currentPosInPlaylist = function (callback) {
-    var s = spawn('itunes-current-pos-in-playlist');
+
+var runCmd = function (cmd, args, callback) {
+    var s = spawn(cmd, args);
+    var contents = "";
     s.stdout.on('data', function (data) {
-        callback(parseInt(data.toString(), 10));
+        contents += data;
+    });
+    s.stdout.on('end', function () {
+        callback(contents);
+    });
+};
+
+var whatsPlaying = function (callback) {
+    runCmd('itunes-whatsplaying', undefined, callback);
+};
+
+var search = function (query, callback) {
+    runCmd('itunes-search', [query], callback);
+};
+
+var currentPosInPlaylist = function (callback) {
+    runCmd('itunes-current-pos-in-playlist', null, function (contents) {
+        callback(parseInt(contents, 10));
     });
 };
 var lengthOfPlaylist = function (callback) {
-    var s = spawn('itunes-length-of-playlist');
-    s.stdout.on('data', function (data) {
-        callback(parseInt(data.toString(), 10));
+    runCmd('itunes-length-of-playlist', null, function (contents) {
+        callback(parseInt(contents, 10));
     });
 };
 
 var irc = new IRC({
-    server : "irc.vassius.se",
-    nick : "mediabot"
+    server : ircServer,
+    nick : nick
 });
 
 var currentSearchPaths = [];
@@ -98,6 +110,7 @@ irc.addListener("privmsg", function (e) {
 
         currentSearchPaths.query = query;
         search(query, function (res) {
+            console.log('got data');
             var tracks = res.split("@!@");
             tracks.pop();
             if (tracks.length === 0) {
@@ -166,5 +179,5 @@ downloadFileFromTo('ecmascript.se', '/2-31%20-%20Nostalgic%20Song%20~Ending%20Th
 
 
 irc.connect(function () {
-    irc.join("#c-test");
+    irc.join(joinChan);
 });
