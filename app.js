@@ -4,30 +4,29 @@ var fs = require('fs');
 var http = require('http');
 var sys = require('sys');
 
+// CACTUS INCLUDES
+Function.prototype.bind = function (scope, arg1) {
+    var args = Array.prototype.slice.call (arguments, 1);
+    var func = this;
+    return function () {
+        return Function.prototype.apply.call(
+            func,
+            scope === null ? this : scope,
+            args.concat(Array.prototype.slice.call(arguments)));
+    };
+};
+Function.prototype.curry = Function.prototype.bind.bind(null, null);
+// END CACTUS
+
+require('./cactus/trunk/Addon/Function.js');
+
 var musicDest = "/Users/adam/musi/downloaded/";
 var ircServer = "irc.vassius.se";
 //ircServer = "irc.freenode.net";
 //ircServer = "se.quakenet.org";
 var nick = "mediabot2";
 var joinChan = "#c-test2";
-//oinChan = "#natur2";
-
-var play = function () {
-    console.log("play");
-    spawn('osascript', ['-e', 'tell app "iTunes" to play']);
-};
-var pause = function () {
-    spawn('osascript', ['-e', 'tell app "iTunes" to pause']);
-};
-var playSong = function(filePath) {
-    console.log('open', ['-a', '/Applications/iTunes.app', filePath]);
-    spawn('open', ['-a', '/Applications/iTunes.app', filePath]);
-};
-var queueSong = function (query, index, callback) {
-    console.log('itunes-queue', [query, index]);
-    var s = spawn('itunes-queue', [query, index]);
-    s.stdout.on('end', callback);
-};
+//joinChan = "#natur2";
 
 var runCmd = function (cmd, args, callback) {
     var s = spawn(cmd, args);
@@ -36,13 +35,22 @@ var runCmd = function (cmd, args, callback) {
         contents += data;
     });
     s.stdout.on('end', function () {
-        callback(contents);
+        if (callback instanceof Function) {
+            callback(contents);
+        }
     });
 };
 
-var whatsPlaying = function (callback) {
-    runCmd('itunes-whatsplaying', undefined, callback);
+var play = runCmd.curry('osascript', ['-e', 'tell app "iTunes" to play']);
+var pause = runCmd.curry('osascript', ['-e', 'tell app "iTunes" to pause']);
+var playSong = function (filePath, callback) {
+    runCmd('open', ['-a', '/Applications/iTunes.app', filePath], callback);
 };
+var queueSong = function (query, index, callback) {
+    runCmd('itunes-queue', [query, index], callback);
+};
+
+var whatsPlaying = runCmd.curry('itunes-whatsplaying', undefined);
 
 var search = function (query, callback) {
     runCmd('itunes-search', [query], callback);
