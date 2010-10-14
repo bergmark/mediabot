@@ -1,3 +1,4 @@
+var joose = require("Joose");
 var IRC = require('./IRC-js/lib/irc');
 var spawn = require('child_process').spawn;
 var fs = require('fs');
@@ -5,6 +6,7 @@ var http = require('http');
 var sys = require('sys');
 
 // CACTUS INCLUDES
+
 Function.prototype.bind = function (scope, arg1) {
     var args = Array.prototype.slice.call (arguments, 1);
     var func = this;
@@ -15,16 +17,11 @@ Function.prototype.bind = function (scope, arg1) {
             args.concat(Array.prototype.slice.call(arguments)));
     };
 };
+
 Function.prototype.curry = Function.prototype.bind.bind(null, null);
 // END CACTUS
 
 var musicDest = "/Users/adam/musi/downloaded/";
-var ircServer = "irc.vassius.se";
-//ircServer = "irc.freenode.net";
-//ircServer = "se.quakenet.org";
-var nick = "mediabot2";
-var joinChan = "#c-test2";
-//joinChan = "#natur2";
 
 var runCmd = function (cmd, args, callback) {
     var s = spawn(cmd, args);
@@ -66,22 +63,71 @@ var itunes = {
     playerState : runCmd.curry('itunes-player-state', null)
 };
 
-var irc = new IRC({
-    server : ircServer,
-    nick : nick
-});
-
 var currentSearchPaths = [];
 
-irc.addListener("privmsg", function (e) {
-    var person = e.person;
-    var command = e.command;
-    var chan = e.params[0];
-    var msg = e.params[1];
+joose.Class("IrcWrapper", {
+    has : {
+        server : {},
+        irc : {
+            is : "ro"
+        },
+        nick : null,
+        joinChannels : {
+            init : function () { return []; }
+        }
+    },
+    methods : {
+        initialize : function () {
+            this.irc = new IRC({
+                server : this.server,
+                nick : this.nick
+            });
+            this.irc.connect(function () {
+                for (var i = 0; i < this.joinChannels.length; i++) {
+                    irc.join(this.joinChannels[i]);
+                }
+            }.bind(this));
+        },
+        onPrivmsg : function (callback) {
+            this.irc.addListener("privmsg", function (e) {
+                callback({
+                    person : e.person,
+                    location : e.params[0],
+                    message : e.params[1],
+                    e : e
+                });
+            });
+        },
+        onPrivmsgMatching : function (options, callback) {
+            this.onPrivmsg(function (h) {
+                if ("messageString" in options && options.messageString !== h.message) {
+                    return;
+                }
+                if ("messageRegexp" in options && !options.messageRegexp.test(h.message)) {
+                    return;
+                }
+                callback(h);
+            });
+        }
+    }
+});
 
-    if (msg === "play") {
-        itunes.play();
-    } else if (/^queue (\d+)/.test(msg)) {
+var ircWrapper = new IrcWrapper({
+    server : "irc.vassius.se",
+    nick : "mediabot2",
+    joinChannels : ["#c-test2"]
+});
+
+
+var irc = ircWrapper.getIrc();
+
+ircWrapper.onPrivmsgMatching({ messageString : "play" }, itunes.play);
+ircWrapper.onPrivmsg(function (e) {
+    var person = e.person;
+    var chan = e.location;
+    var msg = e.message;
+
+    if (/^queue (\d+)/.test(msg)) {
         var trackNo = parseInt(RegExp.$1, 10);
         if (trackNo in currentSearchPaths) {
             itunes.queueSong(currentSearchPaths.query, trackNo + 1, function () {
@@ -202,6 +248,3 @@ function downloadFileFromTo(host, get, dest, callback) {
     });
 }
 
-irc.connect(function () {
-    irc.join(joinChan);
-});
