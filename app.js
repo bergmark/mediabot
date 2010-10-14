@@ -41,31 +41,31 @@ var runCmd = function (cmd, args, callback) {
     });
 };
 
-var play = runCmd.curry('osascript', ['-e', 'tell app "iTunes" to play']);
-var pause = runCmd.curry('osascript', ['-e', 'tell app "iTunes" to pause']);
-var playSong = function (filePath, callback) {
-    runCmd('open', ['-a', '/Applications/iTunes.app', filePath], callback);
-};
-var queueSong = function (query, index, callback) {
-    runCmd('itunes-queue', [query, index], callback);
-};
-
-var whatsPlaying = runCmd.curry('itunes-whatsplaying', undefined);
-
-var search = function (query, callback) {
-    runCmd('itunes-search', [query], callback);
-};
-var queueGet = runCmd.curry('itunes-queue-get', null);
-
-var currentPosInPlaylist = function (callback) {
-    runCmd('itunes-current-pos-in-playlist', null, function (contents) {
-        callback(contents === "" ? 1 : parseInt(contents, 10));
-    });
-};
-var lengthOfPlaylist = function (callback) {
-    runCmd('itunes-length-of-playlist', null, function (contents) {
-        callback(parseInt(contents, 10));
-    });
+var itunes = {
+    play : runCmd.curry('osascript', ['-e', 'tell app "iTunes" to play']),
+    pause : runCmd.curry('osascript', ['-e', 'tell app "iTunes" to pause']),
+    playSong : function (filePath, callback) {
+        runCmd('open', ['-a', '/Applications/iTunes.app', filePath], callback);
+    },
+    queueSong : function (query, index, callback) {
+        runCmd('itunes-queue', [query, index], callback);
+    },
+    whatsPlaying : runCmd.curry('itunes-whatsplaying', undefined),
+    search : function (query, callback) {
+        runCmd('itunes-search', [query], callback);
+    },
+    queueGet : runCmd.curry('itunes-queue-get', null),
+    currentPosInPlaylist : function (callback) {
+        runCmd('itunes-current-pos-in-playlist', null, function (contents) {
+            callback(contents === "" ? 1 : parseInt(contents, 10));
+        });
+    },
+    lengthOfPlaylist : function (callback) {
+        runCmd('itunes-length-of-playlist', null, function (contents) {
+            callback(parseInt(contents, 10));
+        })
+    },
+    playerState : runCmd.curry('itunes-player-state', null)
 };
 
 var irc = new IRC({
@@ -82,13 +82,13 @@ irc.addListener("privmsg", function (e) {
     var msg = e.params[1];
 
     if (msg === "play") {
-        play();
+        itunes.play();
     } else if (/^queue (\d+)/.test(msg)) {
         var trackNo = parseInt(RegExp.$1, 10);
         if (trackNo in currentSearchPaths) {
-            queueSong(currentSearchPaths.query, trackNo + 1, function () {
-                currentPosInPlaylist(function (curPos) {
-                    lengthOfPlaylist(function (lengthOfPlaylist) {
+            itunes.queueSong(currentSearchPaths.query, trackNo + 1, function () {
+                itunes.currentPosInPlaylist(function (curPos) {
+                    itunes.lengthOfPlaylist(function (lengthOfPlaylist) {
                         var queuePos = lengthOfPlaylist - curPos + 1;
                         irc.privmsg(chan,
                                     "Queued " + currentSearchPaths[trackNo].trackName + " in position " + queuePos);
@@ -101,22 +101,28 @@ irc.addListener("privmsg", function (e) {
     } else if (/^play (\d+)/.test(msg)) {
         var trackNo = parseInt(RegExp.$1, 10);
         if (trackNo in currentSearchPaths) {
-            playSong(currentSearchPaths[trackNo].path);
+            itunes.playSong(currentSearchPaths[trackNo].path);
         } else {
             irc.privmsg(chan, "No such index.");
         }
     } else if (msg === "pause") {
-        pause();
-    } else if (msg === "what's playing?") {
-        whatsPlaying(function (data) {
-            irc.privmsg(chan, data);
-        });
+        itunes.pause();
+    } else if (/what'?s playing\??/.test(msg)) {
+        itunes.playerState(function (state) {
+            if (state !== "playing") {
+                irc.privmsg(chan, "iTunes is " + state);
+            } else {
+                itunes.whatsPlaying(function (data) {
+                    irc.privmsg(chan, data);
+                });
+            }
+        })
     } else if (/^search (.+)/.test(msg)) {
         currentSearchPaths = [];
         var query = RegExp.$1;
 
         currentSearchPaths.query = query;
-        search(query, function (res) {
+        itunes.search(query, function (res) {
             console.log('got data');
             var tracks = res.split("@!@");
             tracks.pop();
@@ -127,7 +133,6 @@ irc.addListener("privmsg", function (e) {
                     var t = tracks[i].split("!!@!!");
                     var track = t[0];
                     var path = t[1];
-                    console.log(track);
                     currentSearchPaths.push({
                         path : path,
                         index  : i,
@@ -142,17 +147,21 @@ irc.addListener("privmsg", function (e) {
             }
         });
     } else if (/^printqueue/i.test(msg)) {
-        queueGet(function (res) {
-            var tracks = res.split('@!@');
-            tracks.pop();
-            for (var i = 0; i < tracks.length && i < 3; i++) {
-                var t = tracks[i].split('!!@!!');
-                var track = t[0];
-                var path = t[1];
-                irc.privmsg(chan, i + "\) " + track);
-            }
-            if (tracks.length > 3) {
-                irc.privmsg(chan, "... and " + (tracks.length - 3) + " more tracks");
+        itunes.queueGet(function (res) {
+            if (res === '') {
+                irc.privmsg(chan, "No queue.");
+            } else {
+                var tracks = res.split('@!@');
+                tracks.pop();
+                for (var i = 0; i < tracks.length && i < 3; i++) {
+                    var t = tracks[i].split('!!@!!');
+                    var track = t[0];
+                    var path = t[1];
+                    irc.privmsg(chan, i + "\) " + track);
+                }
+                if (tracks.length > 3) {
+                    irc.privmsg(chan, "... and " + (tracks.length - 3) + " more tracks");
+                }
             }
         });
     } else if (/^download http:\/\/([^\/]+)(\/\S+)/i.test(msg)) {
@@ -162,7 +171,7 @@ irc.addListener("privmsg", function (e) {
         var destFileName = musicDest + Math.random() + ".mp3";
         downloadFileFromTo(host, get, destFileName, function () {
             irc.privmsg(chan, 'Finished getting file. Playing...');
-            playSong(destFileName);
+            itunes.playSong(destFileName);
         });
     } else if (msg === "quit") {
         irc.quit();
