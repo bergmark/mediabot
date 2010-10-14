@@ -18,8 +18,6 @@ Function.prototype.bind = function (scope, arg1) {
 Function.prototype.curry = Function.prototype.bind.bind(null, null);
 // END CACTUS
 
-require('./cactus/trunk/Addon/Function.js');
-
 var musicDest = "/Users/adam/musi/downloaded/";
 var ircServer = "irc.vassius.se";
 //ircServer = "irc.freenode.net";
