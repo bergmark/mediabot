@@ -141,7 +141,7 @@ irc.addListener("privmsg", function (e) {
         var destFileName = musicDest + Math.random() + ".mp3";
         downloadFileFromTo(host, get, destFileName, function () {
             irc.privmsg(chan, 'Finished getting file. Playing...');
-            playFile(destFileName);
+            playSong(destFileName);
         });
     } else {
         console.log('unhandled: ' + msg);
