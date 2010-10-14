@@ -6,9 +6,8 @@ var http = require('http');
 var sys = require('sys');
 
 // CACTUS INCLUDES
-
 Function.prototype.bind = function (scope, arg1) {
-    var args = Array.prototype.slice.call (arguments, 1);
+    var args = Array.prototype.slice.call(arguments, 1);
     var func = this;
     return function () {
         return Function.prototype.apply.call(
@@ -35,6 +34,20 @@ var runCmd = function (cmd, args, callback) {
         }
     });
 };
+
+function parseAppleScriptTracks(str) {
+    var h = [];
+    var tracks = str.split('@!@');
+    tracks.pop();
+    for (var i = 0; i < tracks.length; i++) {
+        var t = tracks[i].split('!!@!!');
+        h.push({
+            name : t[0],
+            path : t[1]
+        });
+    }
+    return h;
+}
 
 var itunes = {
     play : runCmd.curry('osascript', ['-e', 'tell app "iTunes" to play']),
@@ -185,21 +198,18 @@ var ircWrapper = new IrcWrapper({
                 currentSearchPaths.query = query;
                 itunes.search(query, function (res) {
                     console.log('got data');
-                    var tracks = res.split("@!@");
-                    tracks.pop();
+                    var tracks = parseAppleScriptTracks(res)
                     if (tracks.length === 0) {
                         h.reply("Nothing found!");
                     } else {
                         for (var i = 0; i < tracks.length && i < 3; i++) {
-                            var t = tracks[i].split("!!@!!");
-                            var track = t[0];
-                            var path = t[1];
+                            var t = tracks[i];
                             currentSearchPaths.push({
-                                path : path,
+                                path : t.path,
                                 index  : i,
-                                trackName : track
+                                trackName : t.name
                             });
-                            h.reply(i + "\) " + track);
+                            h.reply(i + "\) " + t.name);
                         }
 
                         if (tracks.length > 3) {
@@ -215,13 +225,10 @@ var ircWrapper = new IrcWrapper({
                     if (res === '') {
                         h.reply("No queue.");
                     } else {
-                        var tracks = res.split('@!@');
-                        tracks.pop();
+                        var tracks = parseAppleScriptTracks(res);
                         for (var i = 0; i < tracks.length && i < 3; i++) {
-                            var t = tracks[i].split('!!@!!');
-                            var track = t[0];
-                            var path = t[1];
-                            h.reply(i + "\) " + track);
+                            var t = tracks[i];
+                            h.reply(i + "\) " + t.name);
                         }
                         if (tracks.length > 3) {
                             h.reply("... and " + (tracks.length - 3) + " more tracks");
