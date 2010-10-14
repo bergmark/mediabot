@@ -55,6 +55,7 @@ var whatsPlaying = runCmd.curry('itunes-whatsplaying', undefined);
 var search = function (query, callback) {
     runCmd('itunes-search', [query], callback);
 };
+var queueGet = runCmd.curry('itunes-queue-get', null);
 
 var currentPosInPlaylist = function (callback) {
     runCmd('itunes-current-pos-in-playlist', null, function (contents) {
@@ -132,12 +133,26 @@ irc.addListener("privmsg", function (e) {
                         index  : i,
                         trackName : track
                     });
-                    irc.privmsg(chan, i + ") " + track);
+                    irc.privmsg(chan, i + "\) " + track);
                 }
 
                 if (tracks.length > 3) {
                     irc.privmsg(chan, "... and " + (tracks.length - 3) + " more tracks");
                 }
+            }
+        });
+    } else if (/^printqueue/i.test(msg)) {
+        queueGet(function (res) {
+            var tracks = res.split('@!@');
+            tracks.pop();
+            for (var i = 0; i < tracks.length && i < 3; i++) {
+                var t = tracks[i].split('!!@!!');
+                var track = t[0];
+                var path = t[1];
+                irc.privmsg(chan, i + "\) " + track);
+            }
+            if (tracks.length > 3) {
+                irc.privmsg(chan, "... and " + (tracks.length - 3) + " more tracks");
             }
         });
     } else if (/^download http:\/\/([^\/]+)(\/\S+)/i.test(msg)) {
