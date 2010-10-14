@@ -1,0 +1,3 @@
+[submodule "IRC-js"]
+	path = IRC-js
+	url = http://github.com/gf3/IRC-js.git
