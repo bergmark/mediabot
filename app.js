@@ -1,5 +1,5 @@
-var joose = require("Joose");
 var IRC = require('./IRC-js/lib/irc');
+var joose = require("Joose");
 var spawn = require('child_process').spawn;
 var fs = require('fs');
 var http = require('http');
@@ -74,10 +74,14 @@ joose.Class("IrcWrapper", {
         nick : null,
         joinChannels : {
             init : function () { return []; }
+        },
+        bindings : {
+            init : function () { return {}; }
         }
     },
     methods : {
         initialize : function () {
+            this.bindings.privmsg = this.bindings.privmsg || [];
             this.irc = new IRC({
                 server : this.server,
                 nick : this.nick
@@ -87,26 +91,32 @@ joose.Class("IrcWrapper", {
                     irc.join(this.joinChannels[i]);
                 }
             }.bind(this));
+            for (var i = 0; i < this.bindings.privmsg.length; i++) {
+                var v = this.bindings.privmsg[i];
+                this.onPrivmsgMatching(v);
+            }
         },
         onPrivmsg : function (callback) {
             this.irc.addListener("privmsg", function (e) {
+                var location = e.params[0]
                 callback({
                     person : e.person,
-                    location : e.params[0],
+                    location : location,
                     message : e.params[1],
+                    reply : this.irc.privmsg.bind(this.irc, location),
                     e : e
                 });
-            });
+            }.bind(this));
         },
-        onPrivmsgMatching : function (options, callback) {
+        onPrivmsgMatching : function (options) {
             this.onPrivmsg(function (h) {
                 if ("messageString" in options && options.messageString !== h.message) {
                     return;
                 }
-                if ("messageRegexp" in options && !options.messageRegexp.test(h.message)) {
+                if ("messageRegExp" in options && !options.messageRegExp.test(h.message)) {
                     return;
                 }
-                callback(h);
+                options.callback(h);
             });
         }
     }
@@ -115,114 +125,129 @@ joose.Class("IrcWrapper", {
 var ircWrapper = new IrcWrapper({
     server : "irc.vassius.se",
     nick : "mediabot2",
-    joinChannels : ["#c-test2"]
-});
-
-
-var irc = ircWrapper.getIrc();
-
-ircWrapper.onPrivmsgMatching({ messageString : "play" }, itunes.play);
-ircWrapper.onPrivmsg(function (e) {
-    var person = e.person;
-    var chan = e.location;
-    var msg = e.message;
-
-    if (/^queue (\d+)/.test(msg)) {
-        var trackNo = parseInt(RegExp.$1, 10);
-        if (trackNo in currentSearchPaths) {
-            itunes.queueSong(currentSearchPaths.query, trackNo + 1, function () {
-                itunes.currentPosInPlaylist(function (curPos) {
-                    itunes.lengthOfPlaylist(function (lengthOfPlaylist) {
-                        var queuePos = lengthOfPlaylist - curPos + 1;
-                        irc.privmsg(chan,
-                                    "Queued " + currentSearchPaths[trackNo].trackName + " in position " + queuePos);
+    joinChannels : ["#c-test2"],
+    bindings : {
+        privmsg : [{
+            messageString : "play",
+            callback : itunes.play
+        }, {
+            messageString : "pause",
+            callback : itunes.pause
+        }, {
+            messageString : "quit",
+            callback : itunes.quit
+        }, {
+            messageRegExp : /^queue (\d+)/,
+            callback : function (h) {
+                var trackNo = parseInt(RegExp.$1, 10);
+                if (trackNo in currentSearchPaths) {
+                    itunes.queueSong(currentSearchPaths.query, trackNo + 1, function () {
+                        itunes.currentPosInPlaylist(function (curPos) {
+                            itunes.lengthOfPlaylist(function (lengthOfPlaylist) {
+                                var queuePos = lengthOfPlaylist - curPos + 1;
+                                h.reply("Queued " + currentSearchPaths[trackNo].trackName + " in position " + queuePos);
+                            });
+                        });
                     });
-                });
-            });
-        } else {
-            irc.privmsg(chan, "No such index.");
-        }
-    } else if (/^play (\d+)/.test(msg)) {
-        var trackNo = parseInt(RegExp.$1, 10);
-        if (trackNo in currentSearchPaths) {
-            itunes.playSong(currentSearchPaths[trackNo].path);
-        } else {
-            irc.privmsg(chan, "No such index.");
-        }
-    } else if (msg === "pause") {
-        itunes.pause();
-    } else if (/what'?s playing\??/.test(msg)) {
-        itunes.playerState(function (state) {
-            if (state !== "playing") {
-                irc.privmsg(chan, "iTunes is " + state);
-            } else {
-                itunes.whatsPlaying(function (data) {
-                    irc.privmsg(chan, data);
-                });
+                } else {
+                    h.reply("No such index.");
+                }
             }
-        })
-    } else if (/^search (.+)/.test(msg)) {
-        currentSearchPaths = [];
-        var query = RegExp.$1;
+        }, {
+            messageRegExp : /^play (\d+)/,
+            callback : function (h) {
+                var trackNo = parseInt(RegExp.$1, 10);
+                if (trackNo in currentSearchPaths) {
+                    itunes.playSong(currentSearchPaths[trackNo].path);
+                } else {
+                    h.reply("No such index.");
+                }
+            }
+        }, {
+            messageRegExp : /what'?s playing\??/,
+            callback : function (h) {
+                itunes.playerState(function (state) {
+                    if (state !== "playing") {
+                        h.reply("iTunes is " + state);
+                    } else {
+                        itunes.whatsPlaying(function (data) {
+                            h.reply(data);
+                        });
+                    }
+                })
+            }
+        }, {
+            messageRegExp : /^search (.+)/,
+            callback : function (h) {
+                currentSearchPaths = [];
+                var query = RegExp.$1;
 
-        currentSearchPaths.query = query;
-        itunes.search(query, function (res) {
-            console.log('got data');
-            var tracks = res.split("@!@");
-            tracks.pop();
-            if (tracks.length === 0) {
-                irc.privmsg(chan, "Nothing found!");
-            } else {
-                for (var i = 0; i < tracks.length && i < 3; i++) {
-                    var t = tracks[i].split("!!@!!");
-                    var track = t[0];
-                    var path = t[1];
-                    currentSearchPaths.push({
-                        path : path,
-                        index  : i,
-                        trackName : track
-                    });
-                    irc.privmsg(chan, i + "\) " + track);
-                }
+                currentSearchPaths.query = query;
+                itunes.search(query, function (res) {
+                    console.log('got data');
+                    var tracks = res.split("@!@");
+                    tracks.pop();
+                    if (tracks.length === 0) {
+                        h.reply("Nothing found!");
+                    } else {
+                        for (var i = 0; i < tracks.length && i < 3; i++) {
+                            var t = tracks[i].split("!!@!!");
+                            var track = t[0];
+                            var path = t[1];
+                            currentSearchPaths.push({
+                                path : path,
+                                index  : i,
+                                trackName : track
+                            });
+                            h.reply(i + "\) " + track);
+                        }
 
-                if (tracks.length > 3) {
-                    irc.privmsg(chan, "... and " + (tracks.length - 3) + " more tracks");
-                }
+                        if (tracks.length > 3) {
+                            h.reply("... and " + (tracks.length - 3) + " more tracks");
+                        }
+                    }
+                });
             }
-        });
-    } else if (/^printqueue/i.test(msg)) {
-        itunes.queueGet(function (res) {
-            if (res === '') {
-                irc.privmsg(chan, "No queue.");
-            } else {
-                var tracks = res.split('@!@');
-                tracks.pop();
-                for (var i = 0; i < tracks.length && i < 3; i++) {
-                    var t = tracks[i].split('!!@!!');
-                    var track = t[0];
-                    var path = t[1];
-                    irc.privmsg(chan, i + "\) " + track);
-                }
-                if (tracks.length > 3) {
-                    irc.privmsg(chan, "... and " + (tracks.length - 3) + " more tracks");
-                }
+        } , {
+            messageRegExp : /^printqueue/i,
+            callback : function (h) {
+                itunes.queueGet(function (res) {
+                    if (res === '') {
+                        h.reply("No queue.");
+                    } else {
+                        var tracks = res.split('@!@');
+                        tracks.pop();
+                        for (var i = 0; i < tracks.length && i < 3; i++) {
+                            var t = tracks[i].split('!!@!!');
+                            var track = t[0];
+                            var path = t[1];
+                            h.reply(i + "\) " + track);
+                        }
+                        if (tracks.length > 3) {
+                            h.reply("... and " + (tracks.length - 3) + " more tracks");
+                        }
+                    }
+                });
             }
-        });
-    } else if (/^download http:\/\/([^\/]+)(\/\S+)/i.test(msg)) {
-        console.log('download');
-        var host = RegExp.$1;
-        var get = RegExp.$2;
-        var destFileName = musicDest + Math.random() + ".mp3";
-        downloadFileFromTo(host, get, destFileName, function () {
-            irc.privmsg(chan, 'Finished getting file. Playing...');
-            itunes.playSong(destFileName);
-        });
-    } else if (msg === "quit") {
-        irc.quit();
-    } else {
-        console.log('unhandled: ' + msg);
+        }, {
+            messageRegExp : /^download http:\/\/([^\/]+)(\/\S+)/i,
+            callback : function (h) {
+                console.log('download');
+                var host = RegExp.$1;
+                var get = RegExp.$2;
+                var destFileName = musicDest + Math.random() + ".mp3";
+                downloadFileFromTo(host, get, destFileName, function () {
+                    h.reply('Finished getting file. Playing...');
+                    itunes.playSong(destFileName);
+                });
+
+            }
+        }
+                  ]
     }
 });
+
+var irc = ircWrapper.getIrc();
 
 function downloadFileFromTo(host, get, dest, callback) {
     var ofs = fs.createWriteStream(dest, { encoding : 'binary' });
@@ -247,4 +272,3 @@ function downloadFileFromTo(host, get, dest, callback) {
         request.end();
     });
 }
-
