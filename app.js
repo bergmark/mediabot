@@ -2,19 +2,19 @@ var IRC = require('./IRC-js/lib/irc');
 var spawn = require('child_process').spawn;
 var fs = require('fs');
 var http = require('http');
+var sys = require('sys');
 
 var musicDest = "/Users/adam/musi/downloaded/";
 var ircServer = "irc.vassius.se";
 //ircServer = "irc.freenode.net";
 //ircServer = "se.quakenet.org";
-var nick = "mediabot";
-var joinChan = "#c-test";
+var nick = "mediabot2";
+var joinChan = "#c-test2";
 //oinChan = "#natur2";
 
 var play = function () {
-    console.log("_play");
+    console.log("play");
     spawn('osascript', ['-e', 'tell app "iTunes" to play']);
-    console.log("spawned");
 };
 var pause = function () {
     spawn('osascript', ['-e', 'tell app "iTunes" to pause']);
@@ -23,9 +23,10 @@ var playSong = function(filePath) {
     console.log('open', ['-a', '/Applications/iTunes.app', filePath]);
     spawn('open', ['-a', '/Applications/iTunes.app', filePath]);
 };
-var queueSong = function (query, index) {
+var queueSong = function (query, index, callback) {
     console.log('itunes-queue', [query, index]);
-    spawn('itunes-queue', [query, index]);
+    var s = spawn('itunes-queue', [query, index]);
+    s.stdout.on('end', callback);
 };
 
 var runCmd = function (cmd, args, callback) {
@@ -49,7 +50,7 @@ var search = function (query, callback) {
 
 var currentPosInPlaylist = function (callback) {
     runCmd('itunes-current-pos-in-playlist', null, function (contents) {
-        callback(parseInt(contents, 10));
+        callback(contents === "" ? 1 : parseInt(contents, 10));
     });
 };
 var lengthOfPlaylist = function (callback) {
@@ -74,21 +75,21 @@ irc.addListener("privmsg", function (e) {
     if (msg === "play") {
         play();
     } else if (/^queue (\d+)/.test(msg)) {
-        console.log("QUEUE D");
         var trackNo = parseInt(RegExp.$1, 10);
         if (trackNo in currentSearchPaths) {
-            queueSong(currentSearchPaths.query, trackNo + 1);
-            currentPosInPlaylist(function (curPos) {
-                lengthOfPlaylist(function (lengthOfPlaylist) {
-                    var queuePos = lengthOfPlaylist - curPos + 1;
-                    irc.privmsg(chan, "Queued " + currentSearchPaths[trackNo].trackName + " in position " + queuePos);
+            queueSong(currentSearchPaths.query, trackNo + 1, function () {
+                currentPosInPlaylist(function (curPos) {
+                    lengthOfPlaylist(function (lengthOfPlaylist) {
+                        var queuePos = lengthOfPlaylist - curPos + 1;
+                        irc.privmsg(chan,
+                                    "Queued " + currentSearchPaths[trackNo].trackName + " in position " + queuePos);
+                    });
                 });
             });
         } else {
             irc.privmsg(chan, "No such index.");
         }
     } else if (/^play (\d+)/.test(msg)) {
-        console.log("PLAY D");
         var trackNo = parseInt(RegExp.$1, 10);
         if (trackNo in currentSearchPaths) {
             playSong(currentSearchPaths[trackNo].path);
@@ -96,15 +97,12 @@ irc.addListener("privmsg", function (e) {
             irc.privmsg(chan, "No such index.");
         }
     } else if (msg === "pause") {
-        console.log("pause");
         pause();
     } else if (msg === "what's playing?") {
-        console.log("what's playing?");
         whatsPlaying(function (data) {
             irc.privmsg(chan, data);
         });
     } else if (/^search (.+)/.test(msg)) {
-        console.log("search");
         currentSearchPaths = [];
         var query = RegExp.$1;
 
@@ -143,6 +141,8 @@ irc.addListener("privmsg", function (e) {
             irc.privmsg(chan, 'Finished getting file. Playing...');
             playSong(destFileName);
         });
+    } else if (msg === "quit") {
+        irc.quit();
     } else {
         console.log('unhandled: ' + msg);
     }
