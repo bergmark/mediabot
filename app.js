@@ -52,6 +52,11 @@ function parseAppleScriptTracks(str) {
 var itunes = {
     play : runCmd.curry('osascript', ['-e', 'tell app "iTunes" to play']),
     pause : runCmd.curry('osascript', ['-e', 'tell app "iTunes" to pause']),
+    setVolume : function (vol) {
+        vol = Math.min(100, Math.max(0, parseInt(vol, 10)));
+        console.log('osascript', ['-e', 'tell app "iTunes" to set sound volume to ' + vol])
+        runCmd('osascript', ['-e', 'tell app "iTunes" to set sound volume to ' + vol]);
+    },
     playSong : function (filePath, callback) {
         runCmd('open', ['-a', '/Applications/iTunes.app', filePath], callback);
     },
@@ -129,7 +134,7 @@ joose.Class("IrcWrapper", {
                 if ("messageRegExp" in options && !options.messageRegExp.test(h.message)) {
                     return;
                 }
-                options.callback(h);
+                options.callback.call(this, h);
             });
         }
     }
@@ -137,7 +142,7 @@ joose.Class("IrcWrapper", {
 
 var ircWrapper = new IrcWrapper({
     server : "irc.vassius.se",
-    nick : "mediabot2",
+    nick : "mediabot",
     joinChannels : ["#c-test2"],
     bindings : {
         privmsg : [{
@@ -149,6 +154,12 @@ var ircWrapper = new IrcWrapper({
         }, {
             messageString : "quit",
             callback : itunes.quit
+        }, {
+            messageRegex : /^volume (\d+)/,
+            callback : function (h) {
+                /^volume (\d+)/.test(h.message);
+                itunes.setVolume(RegExp.$1);
+            }
         }, {
             messageRegExp : /^queue (\d+)/,
             callback : function (h) {
@@ -247,10 +258,8 @@ var ircWrapper = new IrcWrapper({
                     h.reply('Finished getting file. Playing...');
                     itunes.playSong(destFileName);
                 });
-
             }
-        }
-                  ]
+        }]
     }
 });
 
