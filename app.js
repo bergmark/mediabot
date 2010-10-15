@@ -53,8 +53,6 @@ var itunes = {
     play : runCmd.curry('osascript', ['-e', 'tell app "iTunes" to play']),
     pause : runCmd.curry('osascript', ['-e', 'tell app "iTunes" to pause']),
     setVolume : function (vol) {
-        vol = Math.min(100, Math.max(0, parseInt(vol, 10)));
-        console.log('osascript', ['-e', 'tell app "iTunes" to set sound volume to ' + vol])
         runCmd('osascript', ['-e', 'tell app "iTunes" to set sound volume to ' + vol]);
     },
     playSong : function (filePath, callback) {
@@ -122,6 +120,7 @@ joose.Class("IrcWrapper", {
                     location : location,
                     message : e.params[1],
                     reply : this.irc.privmsg.bind(this.irc, location),
+                    regExp : null,
                     e : e
                 });
             }.bind(this));
@@ -131,8 +130,11 @@ joose.Class("IrcWrapper", {
                 if ("messageString" in options && options.messageString !== h.message) {
                     return;
                 }
-                if ("messageRegExp" in options && !options.messageRegExp.test(h.message)) {
-                    return;
+                if ("messageRegExp" in options) {
+                    h.regExp = options.messageRegExp.exec(h.message);
+                    if (h.regExp === null) {
+                        return;
+                    }
                 }
                 options.callback.call(this, h);
             });
@@ -142,8 +144,8 @@ joose.Class("IrcWrapper", {
 
 var ircWrapper = new IrcWrapper({
     server : "irc.vassius.se",
-    nick : "mediabot",
-    joinChannels : ["#c-test2"],
+    nick : "mediabot2",
+    joinChannels : ["#c-test"],
     bindings : {
         privmsg : [{
             messageString : "play",
@@ -155,15 +157,16 @@ var ircWrapper = new IrcWrapper({
             messageString : "quit",
             callback : itunes.quit
         }, {
-            messageRegex : /^volume (\d+)/,
+            messageRegExp : /^volume (\d+)/,
             callback : function (h) {
-                /^volume (\d+)/.test(h.message);
-                itunes.setVolume(RegExp.$1);
+                var vol = Math.min(100, parseInt(h.regExp[1], 10));
+                itunes.setVolume(vol);
+                h.reply("Volume set to " + vol);
             }
         }, {
             messageRegExp : /^queue (\d+)/,
             callback : function (h) {
-                var trackNo = parseInt(RegExp.$1, 10);
+                var trackNo = parseInt(h.regExp[1], 10);
                 if (trackNo in currentSearchPaths) {
                     itunes.queueSong(currentSearchPaths.query, trackNo + 1, function () {
                         itunes.currentPosInPlaylist(function (curPos) {
@@ -180,7 +183,7 @@ var ircWrapper = new IrcWrapper({
         }, {
             messageRegExp : /^play (\d+)/,
             callback : function (h) {
-                var trackNo = parseInt(RegExp.$1, 10);
+                var trackNo = parseInt(h.regExp[1], 10);
                 if (trackNo in currentSearchPaths) {
                     itunes.playSong(currentSearchPaths[trackNo].path);
                 } else {
@@ -204,7 +207,7 @@ var ircWrapper = new IrcWrapper({
             messageRegExp : /^search (.+)/,
             callback : function (h) {
                 currentSearchPaths = [];
-                var query = RegExp.$1;
+                var query = h.regExp[1];
 
                 currentSearchPaths.query = query;
                 itunes.search(query, function (res) {
@@ -251,8 +254,8 @@ var ircWrapper = new IrcWrapper({
             messageRegExp : /^download http:\/\/([^\/]+)(\/\S+)/i,
             callback : function (h) {
                 console.log('download');
-                var host = RegExp.$1;
-                var get = RegExp.$2;
+                var host = h.regExp[1];
+                var get = h.regExp[2];
                 var destFileName = musicDest + Math.random() + ".mp3";
                 downloadFileFromTo(host, get, destFileName, function () {
                     h.reply('Finished getting file. Playing...');
