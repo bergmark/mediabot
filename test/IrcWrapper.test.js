@@ -34,6 +34,7 @@ module.exports = {
         var triggers = 0;
         var msg3Msg = null;
         var fooTestHash = null;
+        var locationHash = null;
         var iw = new IrcWrapper({
             IRC : IRCMock,
             server : "irc.vassius.se",
@@ -57,10 +58,16 @@ module.exports = {
                     callback : function (h) {
                         fooTestHash = h;
                     }
+                }, {
+                    location : "#chan2",
+                    callback : function (h) {
+                        locationHash = h;
+                    }
                 }]
             }
         });
 
+        // Match message.
         var ircMock = iw.getIrc();
         ircMock.privmsg("#chan", "msg");
         assert.eql(1, triggers);
@@ -71,6 +78,7 @@ module.exports = {
         ircMock.privmsg("#chan", "msg3");
         assert.eql("msg3", msg3Msg);
 
+        // Match message with regex.
         assert.eql(null, fooTestHash);
         ircMock.privmsg("#chan", "foo");
         assert.eql("foo", fooTestHash.message);
@@ -78,5 +86,11 @@ module.exports = {
         assert.eql("bar foo baz", fooTestHash.message);
         assert.eql("foo", fooTestHash.regExp[1]);
         assert.ok(!(2 in fooTestHash.regExp));
+
+        // Match with location.
+        assert.isNull(locationHash);
+        ircMock.privmsg("#chan2", "some msg");
+        assert.eql("#chan2", locationHash.location);
+        assert.eql("some msg", locationHash.message);
     }
 }
