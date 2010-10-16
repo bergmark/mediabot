@@ -45,7 +45,7 @@ Class('IRCMock', {
 });
 
 module.exports = {
-    "Test" : function (assert) {
+    "event binding test" : function (assert) {
         var triggers = 0;
         var msg3Msg = null;
         var fooTestHash = null;
@@ -135,5 +135,9 @@ module.exports = {
         ircMock.join("#joinchan");
         assert.isDefined(hashes.join);
         assert.eql("#joinchan", hashes.join.location);
-    }
+
+        // listen for arbitrary raws.
+        assert.isUndefined(hashes.arbitrary);
+        ircMock.sendRaw("arbitrary");
+    },
 }
