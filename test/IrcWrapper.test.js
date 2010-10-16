@@ -1,4 +1,5 @@
 require('IrcWrapper');
+var sys = require('sys');
 require('Joose');
 
 Class('IRCMock', {
@@ -20,10 +21,24 @@ Class('IRCMock', {
         },
         privmsg : function (location, message) {
             for (var i = 0; i < this.listeners.length; i++) {
-                this.listeners[i].callback({
-                    person : null,
-                    params : [location, message]
-                });
+                var listener = this.listeners[i];
+                if (listener.raw === "privmsg") {
+                    listener.callback({
+                        person : null,
+                        params : [location, message]
+                    });
+                }
+            }
+        },
+        join : function (location) {
+            for (var i = 0; i < this.listeners.length; i++) {
+                var listener = this.listeners[i];
+                if (listener.raw === "join") {
+                    listener.callback({
+                        person : null,
+                        params : [location]
+                    });
+                }
             }
         }
     }
@@ -64,12 +79,18 @@ module.exports = {
                     callback : function (h) {
                         locationHash = h;
                     }
-                }, { // binding x
+                }, {
                     location : "#chanx",
                     messageString : "msgx",
                     messageRegExp : /msgx/,
                     callback : function (h) {
                         hashes.x = h;
+                    }
+                }],
+                join : [{
+                    channel : "#joinchan",
+                    callback : function (h) {
+                        hashes.join = h;
                     }
                 }]
             }
@@ -101,6 +122,18 @@ module.exports = {
         assert.eql("#chan2", locationHash.location);
         assert.eql("some msg", locationHash.message);
 
-        assert.undefined(hashes.x);
+        assert.isUndefined(hashes.x);
+        ircMock.privmsg("#chanx", "msgx msgx msgx"); // messageString not matching
+        assert.isUndefined(hashes.x);
+        ircMock.privmsg("#chanxx", "msgx"); // location not matching
+        assert.isUndefined(hashes.x);
+        ircMock.privmsg("#chanx", "msgx");
+        assert.isDefined(hashes.x);
+
+        // listen for joins.
+        assert.isUndefined(hashes.join);
+        ircMock.join("#joinchan");
+        assert.isDefined(hashes.join);
+        assert.eql("#joinchan", hashes.join.location);
     }
 }
