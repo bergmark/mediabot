@@ -19,11 +19,11 @@ Class('IRCMock', {
                 callback : callback
             });
         },
-        sendRaw : function (raw) {
+        sendRaw : function (raw, e) {
             for (var i = 0; i < this.listeners.length; i++) {
                 var listener = this.listeners[i];
                 if (listener.raw === raw) {
-                    listener.callback({});
+                    listener.callback(e);
                 }
             }
         },
@@ -48,6 +48,12 @@ Class('IRCMock', {
                     });
                 }
             }
+        },
+        part : function (location) {
+            this.sendRaw("part", {
+                person : null,
+                params : [location]
+            });
         }
     }
 });
@@ -139,7 +145,6 @@ module.exports = {
         assert.isDefined(hashes.x);
 
         // listen for joins.
-        assert.isUndefined(hashes.join);
         ircMock.join("#joinchan");
         assert.isDefined(hashes.join);
         assert.eql("#joinchan", hashes.join.location);
@@ -152,5 +157,15 @@ module.exports = {
         });
         ircMock.sendRaw("arbitrary");
         assert.ok(triggered);
+
+        // listen for parts.
+        iw._onpart({
+            channel : "#partchan",
+            callback : function (h) {
+                hashes.part = h
+            }
+        });
+        ircMock.part("#partchan");
+        assert.eql("#partchan", hashes.part.location);
     }
 };
