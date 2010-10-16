@@ -35,6 +35,7 @@ module.exports = {
         var msg3Msg = null;
         var fooTestHash = null;
         var locationHash = null;
+        var hashes = {};
         var iw = new IrcWrapper({
             IRC : IRCMock,
             server : "irc.vassius.se",
@@ -62,6 +63,13 @@ module.exports = {
                     location : "#chan2",
                     callback : function (h) {
                         locationHash = h;
+                    }
+                }, { // binding x
+                    location : "#chanx",
+                    messageString : "msgx",
+                    messageRegExp : /msgx/,
+                    callback : function (h) {
+                        hashes.x = h;
                     }
                 }]
             }
@@ -92,5 +100,7 @@ module.exports = {
         ircMock.privmsg("#chan2", "some msg");
         assert.eql("#chan2", locationHash.location);
         assert.eql("some msg", locationHash.message);
+
+        assert.undefined(hashes.x);
     }
 }
