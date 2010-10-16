@@ -174,5 +174,25 @@ module.exports = {
         // make sure user and host is set.
         assert.eql(mehash.user, iw.getMe().getUser());
         assert.eql(mehash.host, iw.getMe().getHost());
+
+        // Don't keep channels on part.
+        irc.join('#partchan', mehash);
+        iw.getChannel('#partchan');
+        irc.part('#partchan', mehash);
+        assert.throws(iw.getChannel.bind(iw, '#partchan'));
+
+        // Remove users on part.
+        irc.join('#partchan', mehash);
+        irc.join('#partchan', otherhash)
+        assert.ok(iw.getChannel('#partchan').hasPerson(other));
+        irc.part('#partchan', otherhash)
+        assert.ok(!iw.getChannel('#partchan').hasPerson(other));
+
+        // Remov users on quit.
+        irc.join('#quitchan', mehash);
+        irc.join('#quitchan', otherhash)
+        assert.ok(iw.getChannel('#quitchan').hasPerson(other));
+        irc.quit('#quitchan', otherhash)
+        assert.ok(!iw.getChannel('#quitchan').hasPerson(other));
     }
 };
