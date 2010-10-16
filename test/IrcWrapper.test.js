@@ -34,15 +34,10 @@ Class('IRCMock', {
             });
         },
         join : function (location) {
-            for (var i = 0; i < this.listeners.length; i++) {
-                var listener = this.listeners[i];
-                if (listener.raw === "join") {
-                    listener.callback({
-                        person : null,
-                        params : [location]
-                    });
-                }
-            }
+            this.sendRaw("join", {
+                person : null,
+                params : [location]
+            });
         },
         part : function (location) {
             this.sendRaw("part", {
