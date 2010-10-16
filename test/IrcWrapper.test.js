@@ -147,7 +147,7 @@ module.exports = {
         // listen for arbitrary raws.
         assert.isUndefined(hashes.arbitrary);
         var triggered = false;
-        iw.addArbitraryListener("arbitrary", function () {
+        iw._addListener("arbitrary", function () {
             triggered = true;
         });
         ircMock.sendRaw("arbitrary");
