@@ -157,6 +157,6 @@ module.exports = {
             }
         });
         ircMock.part("#partchan");
-        assert.eql("#partchan", h.location);
+        assert.eql("#partchan", hash.location);
     }
 };
