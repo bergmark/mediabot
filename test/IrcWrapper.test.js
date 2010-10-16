@@ -149,13 +149,14 @@ module.exports = {
         assert.ok(triggered);
 
         // listen for parts.
+        var hash = null;
         iw._onpart({
             channel : "#partchan",
             callback : function (h) {
-                hashes.part = h
+                hash = h;
             }
         });
         ircMock.part("#partchan");
-        assert.eql("#partchan", hashes.part.location);
+        assert.eql("#partchan", h.location);
     }
 };
