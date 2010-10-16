@@ -88,12 +88,6 @@ var ircWrapper = new IrcWrapper({
     nick : "mediabot2",
     joinChannels : ["#c-test"],
     bindings : {
-        join : [{
-            channel : "#c-test",
-            callback : function (h) {
-                h.reply("mediabot online!");
-            }
-        }],
         privmsg : [{
             messageString : "play",
             callback : itunes.play
