@@ -19,6 +19,14 @@ Class('IRCMock', {
                 callback : callback
             });
         },
+        sendRaw : function (raw) {
+            for (var i = 0; i < this.listeners.length; i++) {
+                var listener = this.listeners[i];
+                if (listener.raw === raw) {
+                    listener.callback({});
+                }
+            }
+        },
         privmsg : function (location, message) {
             for (var i = 0; i < this.listeners.length; i++) {
                 var listener = this.listeners[i];
@@ -138,6 +146,11 @@ module.exports = {
 
         // listen for arbitrary raws.
         assert.isUndefined(hashes.arbitrary);
+        var triggered = false;
+        iw.addArbitraryListener("arbitrary", function () {
+            triggered = true;
+        });
         ircMock.sendRaw("arbitrary");
+        assert.ok(triggered);
     },
 }
