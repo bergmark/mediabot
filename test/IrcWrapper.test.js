@@ -152,5 +152,5 @@ module.exports = {
         });
         ircMock.sendRaw("arbitrary");
         assert.ok(triggered);
-    },
-}
+    }
+};
