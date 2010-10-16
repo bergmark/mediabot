@@ -7,7 +7,7 @@ module.exports = {
             nick : 'thenick',
             user : 'theuser',
             host : 'thehost'
-        }
+        };
 
         var triggers = 0;
         var msg3Msg = null;
@@ -194,5 +194,8 @@ module.exports = {
         assert.ok(iw.getChannel('#quitchan').hasPerson(other));
         irc.quit('#quitchan', otherhash)
         assert.ok(!iw.getChannel('#quitchan').hasPerson(other));
+
+        irc.nick(mehash, 'newnick');
+        assert.eql('newnick', iw.getMe().getNick());
     }
 };

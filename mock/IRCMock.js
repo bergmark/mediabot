@@ -65,6 +65,13 @@ Class('IRCMock', {
                 person : person,
                 params : [location, "Quit message!"]
             });
+        },
+        nick : function (person, newNick) {
+            this.sendRaw("nick", {
+                person : person,
+                command : 'NICK',
+                params : [newNick]
+            });
         }
     }
 });
