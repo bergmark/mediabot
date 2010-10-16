@@ -91,7 +91,6 @@ var ircWrapper = new IrcWrapper({
         join : [{
             channel : "#c-test",
             callback : function (h) {
-                console.log(h);
                 h.reply("mediabot online!");
             }
         }],

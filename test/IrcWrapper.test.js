@@ -27,6 +27,11 @@ Class('IRCMock', {
                 }
             }
         },
+        send001 : function (nick) {
+            this.sendRaw("001", {
+                params : [nick, "Welcome message!"]
+            });
+        },
         privmsg : function (location, message, person) {
             if (person === undefined) {
                 throw new Error("privmsg: need to specify person.");
@@ -171,47 +176,64 @@ module.exports = {
                 hash = h;
             }
         });
+        ircMock.join("#partchan", person);
         ircMock.part("#partchan", person);
         assert.eql("#partchan", hash.location);
     },
     "Channel management test" : function (assert) {
-        var iw = new IrcWrapper({
-            IRC : IRCMock,
-            server : "my.server",
-            nick : "mynick",
-            joinChannels : ["#my-join-chan"],
-        });
-        var me = {
+        var mehash = {
             nick : 'me',
             user : 'meuser',
             host : 'mehost'
         };
-        var other = {
+        var otherhash = {
             nick : 'other',
             user : 'otheruser',
             host : 'otherhost'
         };
 
-        // Join a channel and assert that IrcWrapper knows about it.
+        var iw = new IrcWrapper({
+            IRC : IRCMock,
+            server : "my.server",
+            nick : mehash.nick,
+            joinChannels : ["#my-join-chan"]
+        });
         var irc = iw.getIrc();
-        irc.join("#my-join-chan", me);
-        var chan = iw.getChannels()['#my-join-chan'];
+        irc.send001(mehash.nick);
+
+        // Join a channel and assert that IrcWrapper knows about it.
+        irc.join("#my-join-chan", mehash);
+        var chan = iw.getChannel('#my-join-chan');
         assert.eql("#my-join-chan", chan.getName());
-        irc.join("#my-join-chan", other);
+        irc.join("#my-join-chan", otherhash);
         // Don't create several instances.
-        assert.strictEqual(chan, iw.getChannels()['#my-join-chan']);
+        assert.strictEqual(chan, iw.getChannel('#my-join-chan'));
 
         // Store users in channels.
-        var chan = iw.getChannels()['#my-join-chan'];
-        var people = chan.getPeople();
-        assert.eql(2, people.length);
-        assert.isNotNull(people[0]);
-        var me = people[0].getNick() === 'me' ? people[0] : people[1];
-        var other = people[0].getNick() === 'me' ? people[1] : people[0];
+        var chan = iw.getChannel('#my-join-chan');
+        assert.eql(2, chan.getPeopleCount());
+        assert.isNotNull(chan.getPeople()[0]);
+        var me = iw.getPerson('me');
+        var other = iw.getPerson('other');
         assert.ok(me !== other);
-        irc.join('#chan2', me);
-        assert.strictEqual(me, iw.getChannels()['#chan2'].getPeople()[0]);
+        irc.join('#chan2', mehash);
+        var chan2 = iw.getChannel('#chan2');
+        assert.ok(iw.getChannel('#chan2').hasPerson(me));
         assert.strictEqual(me, iw.getPerson('me'));
-        assert.eql(2, iw.getPerson('me').getChannels().length);
+        assert.eql(2, iw.getPerson('me').getChannelCount());
+        assert.ok(me.isInChannel(chan2));
+        assert.ok(chan2.hasPerson(me));
+        assert.ok(!other.isInChannel(chan2));
+        assert.ok(!chan2.hasPerson(other));
+
+        irc.part('#my-join-chan', other);
+        assert.ok(!chan.hasPerson(other));
+        assert.ok(!other.isInChannel(chan));
+
+        // Me.
+        assert.ok(me === iw.getMe());
+        // make sure user and host is set.
+        assert.eql(mehash.user, iw.getMe().getUser());
+        assert.eql(mehash.host, iw.getMe().getHost());
     }
 };
