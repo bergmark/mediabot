@@ -188,7 +188,7 @@ module.exports = {
         irc.part('#partchan', otherhash)
         assert.ok(!iw.getChannel('#partchan').hasPerson(other));
 
-        // Remov users on quit.
+        // Remove users on quit.
         irc.join('#quitchan', mehash);
         irc.join('#quitchan', otherhash)
         assert.ok(iw.getChannel('#quitchan').hasPerson(other));
