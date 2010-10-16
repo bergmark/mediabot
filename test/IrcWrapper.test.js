@@ -28,15 +28,10 @@ Class('IRCMock', {
             }
         },
         privmsg : function (location, message) {
-            for (var i = 0; i < this.listeners.length; i++) {
-                var listener = this.listeners[i];
-                if (listener.raw === "privmsg") {
-                    listener.callback({
-                        person : null,
-                        params : [location, message]
-                    });
-                }
-            }
+            this.sendRaw("privmsg", {
+                person : null,
+                params : [location, message]
+            });
         },
         join : function (location) {
             for (var i = 0; i < this.listeners.length; i++) {
