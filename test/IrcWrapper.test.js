@@ -27,21 +27,30 @@ Class('IRCMock', {
                 }
             }
         },
-        privmsg : function (location, message) {
+        privmsg : function (location, message, person) {
+            if (person === undefined) {
+                throw new Error("privmsg: need to specify person.");
+            }
             this.sendRaw("privmsg", {
-                person : null,
+                person : person,
                 params : [location, message]
             });
         },
-        join : function (location) {
+        join : function (location, person) {
+            if (person === undefined) {
+                throw new Error("join: need to specify person.");
+            }
             this.sendRaw("join", {
-                person : null,
+                person : person,
                 params : [location]
             });
         },
-        part : function (location) {
+        part : function (location, person) {
+            if (person === undefined) {
+                throw new Error("part: need to specify person.");
+            }
             this.sendRaw("part", {
-                person : null,
+                person : person,
                 params : [location]
             });
         }
@@ -50,6 +59,12 @@ Class('IRCMock', {
 
 module.exports = {
     "event binding test" : function (assert) {
+        var person = {
+            nick : 'thenick',
+            user : 'theuser',
+            host : 'thehost'
+        }
+
         var triggers = 0;
         var msg3Msg = null;
         var fooTestHash = null;
@@ -102,44 +117,44 @@ module.exports = {
 
         // Match message.
         var ircMock = iw.getIrc();
-        ircMock.privmsg("#chan", "msg");
+        ircMock.privmsg("#chan", "msg", person);
         assert.eql(1, triggers);
-        ircMock.privmsg("#chan", "msg2");
+        ircMock.privmsg("#chan", "msg2", person);
         assert.eql(1, triggers);
 
         assert.eql(null, msg3Msg);
-        ircMock.privmsg("#chan", "msg3");
+        ircMock.privmsg("#chan", "msg3", person);
         assert.eql("msg3", msg3Msg);
 
         // Match message with regex.
         assert.eql(null, fooTestHash);
-        ircMock.privmsg("#chan", "foo");
+        ircMock.privmsg("#chan", "foo", person);
         assert.eql("foo", fooTestHash.message);
-        ircMock.privmsg("#chan", "bar foo baz");
+        ircMock.privmsg("#chan", "bar foo baz", person);
         assert.eql("bar foo baz", fooTestHash.message);
         assert.eql("foo", fooTestHash.regExp[1]);
         assert.ok(!(2 in fooTestHash.regExp));
 
         // Match with location.
         assert.isNull(locationHash);
-        ircMock.privmsg("#chan2", "some msg");
+        ircMock.privmsg("#chan2", "some msg", person);
         assert.eql("#chan2", locationHash.location);
         assert.eql("some msg", locationHash.message);
 
         assert.isUndefined(hashes.x);
-        ircMock.privmsg("#chanx", "msgx msgx msgx"); // messageString not matching
+        ircMock.privmsg("#chanx", "msgx msgx msgx", person); // messageString not matching
         assert.isUndefined(hashes.x);
-        ircMock.privmsg("#chanxx", "msgx"); // location not matching
+        ircMock.privmsg("#chanxx", "msgx", person); // location not matching
         assert.isUndefined(hashes.x);
-        ircMock.privmsg("#chanx", "msgx");
+        ircMock.privmsg("#chanx", "msgx", person);
         assert.isDefined(hashes.x);
 
-        // listen for joins.
-        ircMock.join("#joinchan");
+        // Listen for joins.
+        ircMock.join("#joinchan", person);
         assert.isDefined(hashes.join);
         assert.eql("#joinchan", hashes.join.location);
 
-        // listen for arbitrary raws.
+        // Listen for arbitrary raws.
         assert.isUndefined(hashes.arbitrary);
         var triggered = false;
         iw._addListener("arbitrary", function () {
@@ -148,7 +163,7 @@ module.exports = {
         ircMock.sendRaw("arbitrary");
         assert.ok(triggered);
 
-        // listen for parts.
+        // Listen for parts.
         var hash = null;
         iw._onpart({
             channel : "#partchan",
@@ -156,7 +171,47 @@ module.exports = {
                 hash = h;
             }
         });
-        ircMock.part("#partchan");
+        ircMock.part("#partchan", person);
         assert.eql("#partchan", hash.location);
+    },
+    "Channel management test" : function (assert) {
+        var iw = new IrcWrapper({
+            IRC : IRCMock,
+            server : "my.server",
+            nick : "mynick",
+            joinChannels : ["#my-join-chan"],
+        });
+        var me = {
+            nick : 'me',
+            user : 'meuser',
+            host : 'mehost'
+        };
+        var other = {
+            nick : 'other',
+            user : 'otheruser',
+            host : 'otherhost'
+        };
+
+        // Join a channel and assert that IrcWrapper knows about it.
+        var irc = iw.getIrc();
+        irc.join("#my-join-chan", me);
+        var chan = iw.getChannels()['#my-join-chan'];
+        assert.eql("#my-join-chan", chan.getName());
+        irc.join("#my-join-chan", other);
+        // Don't create several instances.
+        assert.strictEqual(chan, iw.getChannels()['#my-join-chan']);
+
+        // Store users in channels.
+        var chan = iw.getChannels()['#my-join-chan'];
+        var people = chan.getPeople();
+        assert.eql(2, people.length);
+        assert.isNotNull(people[0]);
+        var me = people[0].getNick() === 'me' ? people[0] : people[1];
+        var other = people[0].getNick() === 'me' ? people[1] : people[0];
+        assert.ok(me !== other);
+        irc.join('#chan2', me);
+        assert.strictEqual(me, iw.getChannels()['#chan2'].getPeople()[0]);
+        assert.strictEqual(me, iw.getPerson('me'));
+        assert.eql(2, iw.getPerson('me').getChannels().length);
     }
 };

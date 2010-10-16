@@ -1,12 +1,10 @@
 var IRC = require('./IRC-js/lib/irc');
-var IrcWrapper = require('./lib/IrcWrapper').IrcWrapper;
 var joose = require("Joose");
 var spawn = require('child_process').spawn;
 var fs = require('fs');
 var http = require('http');
 var sys = require('sys');
-
-console.log('app.js');
+var IrcWrapper = require('./lib/IrcWrapper');
 
 // CACTUS INCLUDES
 Function.prototype.bind = function (scope, arg1) {
@@ -90,6 +88,13 @@ var ircWrapper = new IrcWrapper({
     nick : "mediabot2",
     joinChannels : ["#c-test"],
     bindings : {
+        join : [{
+            channel : "#c-test",
+            callback : function (h) {
+                console.log(h);
+                h.reply("mediabot online!");
+            }
+        }],
         privmsg : [{
             messageString : "play",
             callback : itunes.play
