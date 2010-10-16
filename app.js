@@ -1,9 +1,12 @@
 var IRC = require('./IRC-js/lib/irc');
+var IrcWrapper = require('./lib/IrcWrapper').IrcWrapper;
 var joose = require("Joose");
 var spawn = require('child_process').spawn;
 var fs = require('fs');
 var http = require('http');
 var sys = require('sys');
+
+console.log('app.js');
 
 // CACTUS INCLUDES
 Function.prototype.bind = function (scope, arg1) {
@@ -81,68 +84,8 @@ var itunes = {
 
 var currentSearchPaths = [];
 
-joose.Class("IrcWrapper", {
-    has : {
-        server : {},
-        irc : {
-            is : "ro"
-        },
-        nick : null,
-        joinChannels : {
-            init : function () { return []; }
-        },
-        bindings : {
-            init : function () { return {}; }
-        }
-    },
-    methods : {
-        initialize : function () {
-            this.bindings.privmsg = this.bindings.privmsg || [];
-            this.irc = new IRC({
-                server : this.server,
-                nick : this.nick
-            });
-            this.irc.connect(function () {
-                for (var i = 0; i < this.joinChannels.length; i++) {
-                    irc.join(this.joinChannels[i]);
-                }
-            }.bind(this));
-            for (var i = 0; i < this.bindings.privmsg.length; i++) {
-                var v = this.bindings.privmsg[i];
-                this.onPrivmsgMatching(v);
-            }
-        },
-        onPrivmsg : function (callback) {
-            this.irc.addListener("privmsg", function (e) {
-                var location = e.params[0]
-                callback({
-                    person : e.person,
-                    location : location,
-                    message : e.params[1],
-                    reply : this.irc.privmsg.bind(this.irc, location),
-                    regExp : null,
-                    e : e
-                });
-            }.bind(this));
-        },
-        onPrivmsgMatching : function (options) {
-            this.onPrivmsg(function (h) {
-                if ("messageString" in options && options.messageString !== h.message) {
-                    return;
-                }
-                if ("messageRegExp" in options) {
-                    h.regExp = options.messageRegExp.exec(h.message);
-                    if (h.regExp === null) {
-                        return;
-                    }
-                }
-                options.callback.call(this, h);
-            });
-        }
-    }
-});
-
 var ircWrapper = new IrcWrapper({
+    IRC : IRC,
     server : "irc.vassius.se",
     nick : "mediabot2",
     joinChannels : ["#c-test"],
