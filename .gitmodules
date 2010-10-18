@@ -1,3 +1,6 @@
 [submodule "IRC-js"]
 	path = IRC-js
 	url = http://github.com/gf3/IRC-js.git
+[submodule "IrcWrapper"]
+	path = IrcWrapper
+	url = git@github.com:Raevel/IrcWrapper.git

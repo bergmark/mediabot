@@ -4,7 +4,7 @@ var spawn = require('child_process').spawn;
 var fs = require('fs');
 var http = require('http');
 var sys = require('sys');
-var IrcWrapper = require('./lib/IrcWrapper');
+var IrcWrapper = require('./IrcWrapper/lib/IrcWrapper');
 
 // CACTUS INCLUDES
 Function.prototype.bind = function (scope, arg1) {
